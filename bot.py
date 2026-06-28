@@ -8,6 +8,9 @@ from web3 import Web3
 
 load_dotenv()
 
+# =====================
+# CONFIG
+# =====================
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 RPC_URL = os.getenv("RPC_URL")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
@@ -15,12 +18,24 @@ MAX_SUPPLY = int(os.getenv("MAX_SUPPLY"))
 
 CONTRACT = Web3.to_checksum_address(os.getenv("CONTRACT_ADDRESS"))
 
+# =====================
+# WEB3 SETUP
+# =====================
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
+
+if not w3.is_connected():
+    raise Exception("RPC not connected")
+
+print("Connected:", w3.is_connected())
+print("Latest Block:", w3.eth.block_number)
 
 ZERO = "0x0000000000000000000000000000000000000000"
 
 TRANSFER_TOPIC = Web3.keccak(text="Transfer(address,address,uint256)").hex()
 
+# =====================
+# DISCORD SETUP
+# =====================
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
@@ -32,38 +47,32 @@ async def on_ready():
     global last_block
 
     print("=" * 40)
-    print(f"✅ Logged in as {client.user}")
-    print(f"📦 Starting from block {last_block}")
+    print(f"Logged in as {client.user}")
+    print(f"Watching from block {last_block}")
 
     channel = client.get_channel(CHANNEL_ID)
 
     if channel is None:
-        print("❌ Couldn't find Discord channel!")
+        print("Channel not found")
         return
 
-    print(f"✅ Found channel: #{channel.name}")
+    print(f"Found channel: {channel.name}")
 
     while True:
         try:
             latest = w3.eth.block_number
 
-from_block = max(last_block + 1, latest - 500)  # SMALL RANGE (IMPORTANT)
+            if latest > last_block:
 
-try:
-    logs = w3.eth.get_logs({
-        "fromBlock": from_block,
-        "toBlock": latest,
-        "address": CONTRACT,
-        "topics": [TRANSFER_TOPIC]
-    })
-except Exception as e:
-    print("get_logs failed:", e)
-    logs = []
-           
+                logs = w3.eth.get_logs({
+                    "fromBlock": last_block + 1,
+                    "toBlock": latest,
+                    "address": CONTRACT
+                })
+
                 for log in logs:
-
                     try:
-                        topics = log["topics"]
+                        topics = log.get("topics", [])
 
                         if len(topics) < 3:
                             continue
@@ -71,38 +80,38 @@ except Exception as e:
                         if topics[0].hex().lower() != TRANSFER_TOPIC.lower():
                             continue
 
-                        from_addr = Web3.to_checksum_address("0x" + topics[1].hex()[-40:])
-                        to_addr = Web3.to_checksum_address("0x" + topics[2].hex()[-40:])
+                        from_addr = "0x" + topics[1].hex()[-40:]
+                        to_addr = "0x" + topics[2].hex()[-40:]
 
+                        # mint only
                         if from_addr.lower() != ZERO.lower():
                             continue
 
-                        token_id = int(topics[3].hex(), 16) if len(topics) >= 4 else int(log["data"].hex(), 16)
+                        token_id = int(topics[3].hex(), 16) if len(topics) >= 4 else None
 
                         embed = discord.Embed(
-                            title=f"🦆 Quacker #{token_id} Minted!",
+                            title=f"🦆 Quacker Minted #{token_id}",
                             color=0xFFD54F
                         )
 
-                        embed.add_field(name="Wallet", value=f"`{to_addr}`", inline=False)
+                        embed.add_field(name="To", value=to_addr, inline=False)
                         embed.add_field(name="Supply", value=f"{token_id}/{MAX_SUPPLY}", inline=False)
 
                         await channel.send(embed=embed)
 
-                        print(f"✅ Mint #{token_id}")
+                        print("Mint detected:", token_id)
 
-                    except Exception as e:
-                        print("Log parse error:")
+                    except Exception:
                         traceback.print_exc()
 
-                if latest > last_block:     ...     last_block = latest
+                last_block = latest
+
+            await asyncio.sleep(3)
 
         except Exception:
-            print("RPC Error:")
+            print("RPC error:")
             traceback.print_exc()
+            await asyncio.sleep(5)
 
-        await asyncio.sleep(2)
 
-
-print("Starting Discord bot...")
 client.run(DISCORD_TOKEN)
