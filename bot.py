@@ -49,19 +49,12 @@ async def on_ready():
 
             if latest > last_block:
 
-               try:
-    logs = w3.eth.get_logs({
-        "fromBlock": hex(last_block + 1),
-        "toBlock": hex(latest),
-        "address": CONTRACT,
-        "topics": [TRANSFER_TOPIC]
-    })
-
-except Exception as e:
-    print("RPC failed, skipping block range:", e)
-    await asyncio.sleep(5)
-    continue
-
+       logs = w3.eth.get_logs({
+    "fromBlock": hex(last_block + 1),
+    "toBlock": hex(latest),
+    "address": CONTRACT,
+    "topics": [TRANSFER_TOPIC]
+})
                 for log in logs:
 
                     try:
