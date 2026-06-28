@@ -47,14 +47,19 @@ async def on_ready():
         try:
             latest = w3.eth.block_number
 
-            if latest > last_block:
+from_block = max(last_block + 1, latest - 500)  # SMALL RANGE (IMPORTANT)
 
-       logs = w3.eth.get_logs({
-    "fromBlock": hex(last_block + 1),
-    "toBlock": hex(latest),
-    "address": CONTRACT,
-    "topics": [TRANSFER_TOPIC]
-})
+try:
+    logs = w3.eth.get_logs({
+        "fromBlock": from_block,
+        "toBlock": latest,
+        "address": CONTRACT,
+        "topics": [TRANSFER_TOPIC]
+    })
+except Exception as e:
+    print("get_logs failed:", e)
+    logs = []
+           
                 for log in logs:
 
                     try:
@@ -90,7 +95,7 @@ async def on_ready():
                         print("Log parse error:")
                         traceback.print_exc()
 
-                last_block = latest
+                if latest > last_block:     ...     last_block = latest
 
         except Exception:
             print("RPC Error:")
