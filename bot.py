@@ -64,14 +64,21 @@ async def on_ready():
                     if log["topics"][0].hex().lower() != TRANSFER_TOPIC.lower():
                         continue
 
-                    from_addr = "0x" + log["topics"][1].hex()[-40:]
-                    to_addr = "0x" + log["topics"][2].hex()[-40:]
+                   topics = log["topics"]
 
-                    # Only announce mints
-                    if from_addr.lower() != ZERO.lower():
-                        continue
+if len(topics) < 3:
+    continue
 
-                    token_id = int(log["topics"][3].hex(), 16)
+from_addr = Web3.to_checksum_address("0x" + topics[1].hex()[-40:])
+to_addr = Web3.to_checksum_address("0x" + topics[2].hex()[-40:])
+
+if from_addr.lower() != ZERO.lower():
+    continue
+
+if len(topics) >= 4:
+    token_id = int(topics[3].hex(), 16)
+else:
+    token_id = int(log["data"].hex(), 16)
 
                     embed = discord.Embed(
                         title=f"🦆 Quacker #{token_id} Minted!",
@@ -109,8 +116,10 @@ async def on_ready():
 
                 last_block = latest
 
-        except Exception as e:
-            print("RPC Error:", e)
+      import traceback
+
+except Exception:
+    traceback.print_exc()
 
         await asyncio.sleep(2)
 
