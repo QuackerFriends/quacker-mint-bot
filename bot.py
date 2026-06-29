@@ -38,8 +38,8 @@ TRANSFER_TOPIC = Web3.keccak(
 
 ZERO = "0x0000000000000000000000000000000000000000"
 
-# Start from the current block
-last_block = w3.eth.block_number
+# TEST: replay mint #304
+last_block = 47935918
 
 # =====================
 # DISCORD
@@ -54,7 +54,6 @@ async def on_ready():
 
     print("=" * 40)
     print(f"Logged in as {client.user}")
-    print(f"Watching from block {last_block}")
 
     channel = client.get_channel(CHANNEL_ID)
 
@@ -64,74 +63,71 @@ async def on_ready():
 
     print(f"Found channel: {channel.name}")
 
-    while True:
+    latest = 47935919
 
-        try:
+    logs = w3.eth.get_logs({
+        "fromBlock": latest,
+        "toBlock": latest,
+        "address": CONTRACT,
+        "topics": [TRANSFER_TOPIC]
+    })
 
-            latest = w3.eth.block_number
+    print(f"Found {len(logs)} transfer logs")
 
-            if latest > last_block:
+    for log in logs:
 
-                logs = w3.eth.get_logs({
-                    "fromBlock": last_block + 1,
-                    "toBlock": latest,
-                    "address": CONTRACT,
-                    "topics": [TRANSFER_TOPIC]
-                })
+        topics = log["topics"]
 
-                print(f"Blocks {last_block+1}-{latest}: {len(logs)} transfer logs")
+        if len(topics) < 4:
+            continue
 
-                for log in logs:
+        from_addr = "0x" + topics[1].hex()[-40:]
+        to_addr = "0x" + topics[2].hex()[-40:]
 
-                    topics = log["topics"]
+        if from_addr.lower() != ZERO.lower():
+            continue
 
-                    if len(topics) < 4:
-                        continue
+        token_id = int(topics[3].hex(), 16)
 
-                    from_addr = "0x" + topics[1].hex()[-40:]
-                    to_addr = "0x" + topics[2].hex()[-40:]
+        embed = discord.Embed(
+            title=f"🦆 Quacker Friend #{token_id} Minted!",
+            description="A new Quacker Friend has joined the flock! 🎉",
+            color=0xFFD54F,
+            url=f"https://opensea.io/assets/base/{CONTRACT}/{token_id}"
+        )
 
-                    if from_addr.lower() != ZERO.lower():
-                        continue
+        embed.set_image(
+            url=f"https://box.quackerfriends.xyz/images/{token_id}.png"
+        )
 
-                    token_id = int(topics[3].hex(), 16)
+        embed.add_field(
+            name="👤 Owner",
+            value=f"`{to_addr}`",
+            inline=False
+        )
 
-                    print(f"Mint detected #{token_id}")
+        embed.add_field(
+            name="📈 Supply",
+            value=f"{token_id}/{MAX_SUPPLY}",
+            inline=True
+        )
 
-                    embed = discord.Embed(
-                        title=f"🦆 Quacker #{token_id} Minted!",
-                        description="A new Quacker Friend has joined the flock!",
-                        color=0xFFD54F
-                    )
+        embed.add_field(
+            name="🌊 OpenSea",
+            value=f"https://opensea.io/assets/base/{CONTRACT}/{token_id}",
+            inline=False
+        )
 
-                    embed.add_field(
-                        name="Wallet",
-                        value=f"`{to_addr}`",
-                        inline=False
-                    )
+        embed.set_footer(
+            text="Quacker Friends • Base"
+        )
 
-                    embed.add_field(
-                        name="Supply",
-                        value=f"{token_id}/{MAX_SUPPLY}",
-                        inline=False
-                    )
+        await channel.send(embed=embed)
 
-                    embed.add_field(
-                        name="OpenSea",
-                        value=f"https://opensea.io/assets/base/{CONTRACT}/{token_id}",
-                        inline=False
-                    )
+        print(f"Sent test embed for #{token_id}")
 
-                    await channel.send(embed=embed)
-
-                last_block = latest
-
-            # Poll every 10 seconds to avoid rate limits
-            await asyncio.sleep(10)
-
-        except Exception:
-            traceback.print_exc()
-            await asyncio.sleep(15)
+    print("✅ Test complete.")
+    await client.close()
 
 
 print("Starting Discord bot...")
