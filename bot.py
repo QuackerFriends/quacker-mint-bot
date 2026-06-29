@@ -129,7 +129,7 @@ async def on_ready():
 
     print("✅ Test complete.")
     
-# await client.close()
+ await client.close()
 
 print("Starting Discord bot...")
 client.run(DISCORD_TOKEN)
