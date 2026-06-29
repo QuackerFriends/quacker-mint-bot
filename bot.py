@@ -1,3 +1,4 @@
+```python
 import os
 import asyncio
 import traceback
@@ -11,6 +12,7 @@ load_dotenv()
 # =====================
 # CONFIG
 # =====================
+
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 RPC_URL = os.getenv("RPC_URL")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
@@ -38,8 +40,8 @@ TRANSFER_TOPIC = Web3.keccak(
 
 ZERO = "0x0000000000000000000000000000000000000000"
 
-# TEST: replay mint #304
-last_block = 47935918
+# Start watching from the current block
+last_block = w3.eth.block_number
 
 # =====================
 # DISCORD
@@ -62,73 +64,89 @@ async def on_ready():
         return
 
     print(f"Found channel: {channel.name}")
+    print(f"Watching from block {last_block}")
 
-    latest =  47977670 
+    while True:
 
-    logs = w3.eth.get_logs({
-        "fromBlock": latest,
-        "toBlock": latest,
-        "address": CONTRACT,
-        "topics": [TRANSFER_TOPIC]
-    })
+        try:
 
-    print(f"Found {len(logs)} transfer logs")
+            latest = w3.eth.block_number
 
-    for log in logs:
+            if latest > last_block:
 
-        topics = log["topics"]
+                print(f"Checking blocks {last_block + 1} -> {latest}")
 
-        if len(topics) < 4:
-            continue
+                logs = w3.eth.get_logs({
+                    "fromBlock": last_block + 1,
+                    "toBlock": latest,
+                    "address": CONTRACT,
+                    "topics": [TRANSFER_TOPIC]
+                })
 
-        from_addr = "0x" + topics[1].hex()[-40:]
-        to_addr = "0x" + topics[2].hex()[-40:]
+                print(f"Found {len(logs)} transfer logs")
 
-        if from_addr.lower() != ZERO.lower():
-            continue
+                for log in logs:
 
-        token_id = int(topics[3].hex(), 16)
+                    topics = log["topics"]
 
-        embed = discord.Embed(
-            title=f"🦆 Quacker Friend #{token_id} Minted!",
-            description="A new Quacker Friend has joined the flock! 🎉",
-            color=0xFFD54F,
-            url=f"https://opensea.io/assets/base/{CONTRACT}/{token_id}"
-        )
+                    if len(topics) < 4:
+                        continue
 
-        embed.set_image(
-            url=f"https://box.quackerfriends.xyz/images/{token_id}.png"
-        )
+                    from_addr = "0x" + topics[1].hex()[-40:]
+                    to_addr = "0x" + topics[2].hex()[-40:]
 
-        embed.add_field(
-            name="👤 Owner",
-            value=f"`{to_addr}`",
-            inline=False
-        )
+                    # Only announce mints
+                    if from_addr.lower() != ZERO.lower():
+                        continue
 
-        embed.add_field(
-            name="📈 Supply",
-            value=f"{token_id}/{MAX_SUPPLY}",
-            inline=True
-        )
+                    token_id = int(topics[3].hex(), 16)
 
-        embed.add_field(
-            name="🌊 OpenSea",
-            value=f"https://opensea.io/assets/base/{CONTRACT}/{token_id}",
-            inline=False
-        )
+                    print(f"Mint detected #{token_id}")
 
-        embed.set_footer(
-            text="Quacker Friends • Base"
-        )
+                    embed = discord.Embed(
+                        title=f"🦆 Quacker Friend #{token_id} Minted!",
+                        description="A new Quacker Friend has joined the flock! 🎉",
+                        color=0xFFD54F,
+                        url=f"https://opensea.io/assets/base/{CONTRACT}/{token_id}"
+                    )
 
-        await channel.send(embed=embed)
+                    embed.set_image(
+                        url=f"https://box.quackerfriends.xyz/images/{token_id}.png"
+                    )
 
-        print(f"Sent test embed for #{token_id}")
+                    embed.add_field(
+                        name="👤 Owner",
+                        value=f"`{to_addr}`",
+                        inline=False
+                    )
 
-    print("✅ Test complete.")
-    await client.close()
+                    embed.add_field(
+                        name="📈 Supply",
+                        value=f"{token_id}/{MAX_SUPPLY}",
+                        inline=True
+                    )
+
+                    embed.add_field(
+                        name="🌊 OpenSea",
+                        value=f"https://opensea.io/assets/base/{CONTRACT}/{token_id}",
+                        inline=False
+                    )
+
+                    embed.set_footer(
+                        text="Quacker Friends • Base"
+                    )
+
+                    await channel.send(embed=embed)
+
+                last_block = latest
+
+            await asyncio.sleep(10)
+
+        except Exception:
+            traceback.print_exc()
+            await asyncio.sleep(15)
 
 
 print("Starting Discord bot...")
 client.run(DISCORD_TOKEN)
+```
