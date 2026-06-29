@@ -39,7 +39,8 @@ TRANSFER_TOPIC = Web3.keccak(
 ZERO = "0x0000000000000000000000000000000000000000"
 
 # TEST: replay mint #304
-last_block = 47935918
+#last_block = 47935918
+last_block = 47976758
 
 # =====================
 # DISCORD
@@ -63,7 +64,7 @@ async def on_ready():
 
     print(f"Found channel: {channel.name}")
 
-    latest = 47935919
+    latest = 47976758
 
     logs = w3.eth.get_logs({
         "fromBlock": latest,
@@ -127,8 +128,8 @@ async def on_ready():
         print(f"Sent test embed for #{token_id}")
 
     print("✅ Test complete.")
-    await client.close()
-
+    
+# await client.close()
 
 print("Starting Discord bot...")
 client.run(DISCORD_TOKEN)
