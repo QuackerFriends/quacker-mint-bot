@@ -16,26 +16,32 @@ RPC_URL = os.getenv("RPC_URL")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
 MAX_SUPPLY = int(os.getenv("MAX_SUPPLY"))
 
-CONTRACT = Web3.to_checksum_address(os.getenv("CONTRACT_ADDRESS"))
+CONTRACT = Web3.to_checksum_address(
+    os.getenv("CONTRACT_ADDRESS")
+)
 
 # =====================
-# WEB3 SETUP
+# WEB3
 # =====================
+
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 
 if not w3.is_connected():
-    raise Exception("RPC not connected")
+    raise Exception("RPC not connected!")
 
 print("Connected:", w3.is_connected())
 print("Latest Block:", w3.eth.block_number)
 
 ZERO = "0x0000000000000000000000000000000000000000"
 
-TRANSFER_TOPIC = Web3.keccak(text="Transfer(address,address,uint256)").hex()
+TRANSFER_TOPIC = Web3.keccak(
+    text="Transfer(address,address,uint256)"
+).hex()
 
 # =====================
-# DISCORD SETUP
+# DISCORD
 # =====================
+
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
@@ -53,65 +59,100 @@ async def on_ready():
     channel = client.get_channel(CHANNEL_ID)
 
     if channel is None:
-        print("Channel not found")
+        print("Couldn't find Discord channel.")
         return
 
     print(f"Found channel: {channel.name}")
 
     while True:
+
         try:
+
             latest = w3.eth.block_number
 
             if latest > last_block:
 
-                logs = w3.eth.get_logs({
-                    "fromBlock": last_block + 1,
-                    "toBlock": latest,
-                    "address": CONTRACT
-                })
+                for block in range(last_block + 1, latest + 1):
 
-                for log in logs:
+                    print(f"Checking block {block}")
+
                     try:
-                        topics = log.get("topics", [])
 
-                        if len(topics) < 3:
-                            continue
+                        logs = w3.eth.get_logs({
+                            "fromBlock": block,
+                            "toBlock": block,
+                            "address": CONTRACT,
+                            "topics": [TRANSFER_TOPIC]
+                        })
 
-                        if topics[0].hex().lower() != TRANSFER_TOPIC.lower():
-                            continue
+                    except Exception as e:
+                        print("RPC Error:", e)
+                        continue
 
-                        from_addr = "0x" + topics[1].hex()[-40:]
-                        to_addr = "0x" + topics[2].hex()[-40:]
+                    print(f"Found {len(logs)} logs")
 
-                        # mint only
-                        if from_addr.lower() != ZERO.lower():
-                            continue
+                    for log in logs:
 
-                        token_id = int(topics[3].hex(), 16) if len(topics) >= 4 else None
+                        try:
 
-                        embed = discord.Embed(
-                            title=f"🦆 Quacker Minted #{token_id}",
-                            color=0xFFD54F
-                        )
+                            topics = log["topics"]
 
-                        embed.add_field(name="To", value=to_addr, inline=False)
-                        embed.add_field(name="Supply", value=f"{token_id}/{MAX_SUPPLY}", inline=False)
+                            if len(topics) < 4:
+                                continue
 
-                        await channel.send(embed=embed)
+                            from_addr = "0x" + topics[1].hex()[-40:]
+                            to_addr = "0x" + topics[2].hex()[-40:]
 
-                        print("Mint detected:", token_id)
+                            if from_addr.lower() != ZERO.lower():
+                                continue
 
-                    except Exception:
-                        traceback.print_exc()
+                            token_id = int(topics[3].hex(), 16)
+
+                            print(f"Mint detected #{token_id}")
+
+                            embed = discord.Embed(
+                                title=f"🦆 Quacker #{token_id} Minted!",
+                                description="A new Quacker Friend has joined the flock!",
+                                color=0xFFD54F
+                            )
+
+                            embed.add_field(
+                                name="Wallet",
+                                value=f"`{to_addr}`",
+                                inline=False
+                            )
+
+                            embed.add_field(
+                                name="Supply",
+                                value=f"{token_id}/{MAX_SUPPLY}",
+                                inline=False
+                            )
+
+                            embed.add_field(
+                                name="OpenSea",
+                                value=f"https://opensea.io/assets/base/{CONTRACT}/{token_id}",
+                                inline=False
+                            )
+
+                            embed.add_field(
+                                name="BaseScan",
+                                value=f"https://basescan.org/token/{CONTRACT}?a={token_id}",
+                                inline=False
+                            )
+
+                            await channel.send(embed=embed)
+
+                        except Exception:
+                            traceback.print_exc()
 
                 last_block = latest
 
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
 
         except Exception:
-            print("RPC error:")
             traceback.print_exc()
             await asyncio.sleep(5)
 
 
+print("Starting Discord bot...")
 client.run(DISCORD_TOKEN)
