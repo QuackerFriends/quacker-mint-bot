@@ -149,4 +149,4 @@ async def on_ready():
 
 print("Starting Discord bot...")
 client.run(DISCORD_TOKEN)
-```
+
