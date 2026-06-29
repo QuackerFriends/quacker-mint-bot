@@ -45,7 +45,7 @@ TRANSFER_TOPIC = Web3.keccak(
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
-last_block = w3.eth.block_number
+last_block = 47935918
 
 
 @client.event
