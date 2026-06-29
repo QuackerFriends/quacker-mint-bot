@@ -63,7 +63,7 @@ async def on_ready():
 
     print(f"Found channel: {channel.name}")
 
-    latest = 47935919
+    latest =  47976758 
 
     logs = w3.eth.get_logs({
         "fromBlock": latest,
